@@ -1,5 +1,4 @@
-package gocrawler
-
+package main
 import (
 	"fmt"
 	"os"
@@ -14,7 +13,11 @@ func main() {
 		return
 	}
 
-	domainName := args[1]
+	url := args[1]
 
-	fmt.Println("Hello, world " + domainName)
+	//fmt.Println("Hello, world " + url)
+
+	Scan(url)
+
+
 }
