@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 )
 
-func assertErrors(t *testing.T, r *DomainScan, e error, msg string) {
+func assertErrors(t *testing.T, r []Page, e error, msg string) {
 
 	if (r != nil) {
 		t.Errorf("Wanted nil result " + msg)
@@ -49,6 +49,20 @@ var (
 <p><a HREF='http://other.example.com/link3'>My</a> first paragraph.</p>
 <p><a href="#sometarget">My</a> first paragraph
 <p><a href="javascript:void(0);">bad link</a>
+
+</body>
+</html>`
+
+	noLinkTestHtml = `<!DOCTYPE html>
+<html>
+<head>
+	 <script src="/script1.js"></script>
+	 <link href="/assets/css/css1.css" media="screen" rel="stylesheet" type="text/css" />
+</head>
+<body>
+
+<h1>Test Document</h1>
+<img src="/assets/images/image1.jpg">
 
 </body>
 </html>`
@@ -99,6 +113,24 @@ func TestFindLinks(t *testing.T) {
 	}
 }
 
+func TestFindResources(t *testing.T) {
+	resources := findStaticResources("http://example.com", noLinkTestHtml)
+
+	correctResources := []string{ "http://example.com/assets/images/image1.jpg",
+		"http://example.com/script1.js",
+		"http://example.com/assets/css/css1.css"}
+
+	if (len(resources) != len(correctResources)) {
+		t.Errorf("Found %s resources, expecting %d", resources, len(correctResources))
+	}
+
+	for _, element := range correctResources  {
+		if (listContains(element, resources) == -1) {
+			t.Errorf("Found missing %s", element)
+		}
+	}
+}
+
 func TestGetHtml(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, testhtml)
@@ -106,6 +138,19 @@ func TestGetHtml(t *testing.T) {
 	defer ts.Close()
 
 	getHtml(ts.URL)
+}
+
+func TestReturnPageWithNoLinks(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, noLinkTestHtml)
+	}))
+	defer ts.Close()
+
+	pages, _ := Scan(ts.URL)
+
+	if (len(pages) != 1) {
+		t.Error("Expected to get back a single page")
+	}
 }
 
 func TestHttpError(t *testing.T) {
@@ -122,7 +167,20 @@ func TestHttpError(t *testing.T) {
 	}
 }
 
+func TestDefaultUrlFilter(t *testing.T) {
+	defaultFilter := createDefaultUrlFilter("http://example.com")
+	if (!defaultFilter("http://example.com/link1")) {
+		t.Error("Expected to follow link to same host")
+	}
+	if (!defaultFilter("https://example.com/link1")) {
+		t.Error("Expected to follow link to same host")
+	}
+	if (defaultFilter("http://other.url.com/link")) {
+		t.Error("Expected not to follow link to other host")
+	}
+}
+
 func TestWholeEnchilada(t *testing.T) {
-	//Scan("http://www.digitalocean.com")
+	Scan("http://www.digitalocean.com")
 }
 

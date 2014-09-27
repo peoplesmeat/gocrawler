@@ -9,6 +9,14 @@ import (
 	"sync"
 )
 
+var (
+	//modified version of solution found http://stackoverflow.com/questions/15926142/regular-expression-for-finding-href-value-of-a-a-link
+	hrefRegex = "(?i)<a\\s+(?:[^>]*?\\s+)?href=[\",']([^\"']*)[\",']"
+	imageRegex = "(?i)<img\\s+(?:[^>]*?\\s+)?src=[\",']([^\"']*)[\",']"
+	javascriptRegex = "(?i)<script\\s+(?:[^>]*?\\s+	)?src=[\",']([^\"']*)[\",']"
+	cssRegex = "(?i)<link\\s+(?:[^>]*?\\s+	)?href=[\",']([^\"']*)[\",']"
+)
+
 type argError struct {
 	arg  int
 	prob string
@@ -20,13 +28,17 @@ type DomainScanOptions struct {
 	urlFilter UrlFilter
 }
 
-func NewDomainScanOptions(rootUrl string)(*DomainScanOptions) {
-	options := new(DomainScanOptions)
-	options.urlFilter = func(target string)(bool){
+func createDefaultUrlFilter(rootUrl string)(UrlFilter) {
+	return func(target string)(bool){
 		rootUrl, _ := url.Parse(rootUrl)
 		targetUrl, _ := url.Parse(target)
 		return rootUrl.Host == targetUrl.Host
 	}
+}
+
+func NewDomainScanOptions(rootUrl string)(*DomainScanOptions) {
+	options := new(DomainScanOptions)
+	options.urlFilter = createDefaultUrlFilter(rootUrl)
 
 	return options
 }
@@ -44,6 +56,7 @@ type Page struct {
 	url string
 	staticResources []string
 	linksTo []string
+	resources []string
 }
 
 /*func NewUrlList() *UrlList {
@@ -90,9 +103,7 @@ func validateUrl(domainName string) (*url.URL, error) {
 
 }
 
-func findHrefs(html string) ([]string) {
-	//modified version of solution found http://stackoverflow.com/questions/15926142/regular-expression-for-finding-href-value-of-a-a-link
-	re := regexp.MustCompile("(?i)<a\\s+(?:[^>]*?\\s+)?href=[\",']([^\"']*)[\",']")
+func findAllMatches(re *regexp.Regexp, html string)([]string) {
 	matches := re.FindAllStringSubmatch(html, -1)
 
 	links := make([]string,0)
@@ -103,10 +114,8 @@ func findHrefs(html string) ([]string) {
 	return links
 }
 
-func findLinks(root string, html string) ([]string){
+func resolveTargetUrls(root string, targets []string)([]string) {
 	rootUrl, _ := url.Parse(root)
-
-	targets := findHrefs(html)
 
 	resolvedTargets := make([]string,0)
 	for i:=0;i<len(targets);i++ {
@@ -118,12 +127,34 @@ func findLinks(root string, html string) ([]string){
 		}
 
 	}
-
 	return resolvedTargets
 }
 
-func findStaticResources(html string)([]string) {
-	return make([]string, 0)
+func findHrefs(html string) ([]string) {
+
+	re := regexp.MustCompile(hrefRegex)
+	return findAllMatches(re,html)
+}
+
+func findLinks(root string, html string) ([]string){
+
+	targets := findHrefs(html)
+	return resolveTargetUrls(root, targets)
+}
+
+func findStaticResources(root string, html string)([]string) {
+	imageRe := regexp.MustCompile(imageRegex)
+	javascriptRe := regexp.MustCompile(javascriptRegex)
+	cssRe := regexp.MustCompile(cssRegex)
+
+	imageTargets := findAllMatches(imageRe, html)
+	javascriptTargets := findAllMatches(javascriptRe, html)
+	cssTargets := findAllMatches(cssRe, html)
+
+
+	return append(resolveTargetUrls(root, imageTargets),
+				  append(resolveTargetUrls(root, javascriptTargets),
+					     resolveTargetUrls(root, cssTargets)...)...)
 }
 
 func getHtml(url string) (string, error) {
@@ -169,11 +200,14 @@ func doPageScan(url string, parent string, scannedUrls *UrlList, domainScanOptio
 	}
 
 	links := findLinks(url, html)
+	resources := findStaticResources(url, html)
+
+	fmt.Printf("\tFound %s\n", resources)
 
 	var page Page
 	page.url = url
 	page.linksTo = links
-
+	page.resources = resources
 	pages := []Page{page}
 
 	for i:=0; i<len(links); i++ {
@@ -185,27 +219,25 @@ func doPageScan(url string, parent string, scannedUrls *UrlList, domainScanOptio
 	return pages
 }
 
-func Scan(url string) (*DomainScan, error) {
+func Scan(url string) ([]Page, error) {
 
-	u, err := validateUrl(url)
+	_, err := validateUrl(url)
 	if (err != nil) {
 		return nil, err
 	}
 
 	//Send a test request
 	resp, err := http.Get(url)
-	if (err != nil) {
+	if (err != nil || resp.StatusCode != http.StatusOK) {
 		return nil, err
 	}
-
-	fmt.Println("returning nil error:" + u.Scheme + ":" + u.Host + ":" + resp.Status)
 
 	var scannedUrls UrlList
 
 	options := NewDomainScanOptions(url)
 
-	doPageScan(url, "", &scannedUrls, options)
+	return doPageScan(url, "", &scannedUrls, options), nil
 
-	return nil, nil
+	//return nil, nil
 
 }
