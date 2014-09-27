@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"regexp"
 	"sync"
+	"strings"
 )
 
 var (
@@ -168,11 +169,17 @@ func getHtml(url string) (string, error) {
 	html_bytes, _:= ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
 
-	html := string(html_bytes)
-
 	if (resp.StatusCode != http.StatusOK) {
-		return html, &argError{0, "Server Error"}
+		return string(html_bytes), &argError{0, "Server Error"}
 	}
+
+	content_type := http.DetectContentType(html_bytes)
+	if (!strings.HasPrefix(content_type, "text/html;")) {
+		fmt.Printf("Found %s", http.DetectContentType(html_bytes))
+		return "", nil
+	}
+
+	html := string(html_bytes)
 
 	return html, nil
 }

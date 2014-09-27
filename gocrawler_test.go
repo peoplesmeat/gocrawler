@@ -181,6 +181,6 @@ func TestDefaultUrlFilter(t *testing.T) {
 }
 
 func TestWholeEnchilada(t *testing.T) {
-	Scan("http://www.digitalocean.com")
+	//Scan("http://www.digitalocean.com")
 }
 
