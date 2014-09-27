@@ -184,7 +184,8 @@ func getHtml(url string) (string, error) {
 	return html, nil
 }
 
-func doPageScan(url string, parent string, scannedUrls *UrlList, domainScanOptions *DomainScanOptions)([]Page) {
+func doPageScan(url string, parent string, scannedUrls *UrlList,
+	domainScanOptions *DomainScanOptions, output chan Page)([]Page) {
 
 	//verify that we haven't already scanned this url
 	if (scannedUrls.InList(url)) {
@@ -217,11 +218,19 @@ func doPageScan(url string, parent string, scannedUrls *UrlList, domainScanOptio
 	page.resources = resources
 	pages := []Page{page}
 
+	var wg sync.WaitGroup
+	wg.Add(len(links))
 	for i:=0; i<len(links); i++ {
-		//check if already scanned
-		childPages := doPageScan(links[i], url, scannedUrls, domainScanOptions)
-		pages = append(pages, childPages...)
+		l := links[i]
+		go func() {
+			defer wg.Done()
+			doPageScan(l, url, scannedUrls, domainScanOptions, output)
+		}()
+		//childPages := doPageScan(links[i], url, scannedUrls, domainScanOptions, output)
+		//pages = append(pages, childPages...)
 	}
+	wg.Wait()
+	output <- page
 
 	return pages
 }
@@ -243,7 +252,16 @@ func Scan(url string) ([]Page, error) {
 
 	options := NewDomainScanOptions(url)
 
-	return doPageScan(url, "", &scannedUrls, options), nil
+	output := make(chan Page)
+
+	go func() {
+		for {
+			msg := <-output
+			fmt.Println(msg.url)
+		}
+	}()
+
+	return doPageScan(url, "", &scannedUrls, options, output), nil
 
 	//return nil, nil
 
