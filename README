@@ -1,0 +1,5 @@
+# gocrawler
+
+## a webcrawler written in go
+
+Features configurable concurrent crawling, allowing users to specify the number of outstanding web requests. 
