@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 )
 
-func assertErrors(t *testing.T, r []Page, e error, msg string) {
+func assertErrors(t *testing.T, r map[string]Page, e error, msg string) {
 
 	if (r != nil) {
 		t.Errorf("Wanted nil result " + msg)
@@ -137,7 +137,7 @@ func TestGetHtml(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	getHtml(ts.URL)
+	getHtml(ts.URL, make(semaphore,1))
 }
 
 func TestReturnPageWithNoLinks(t *testing.T) {
@@ -149,8 +149,18 @@ func TestReturnPageWithNoLinks(t *testing.T) {
 	pages, _ := Scan(ts.URL)
 
 	if (len(pages) != 1) {
-		t.Error("Expected to get back a single page")
+		t.Error("Expected to get back a single page, instead found", pages)
 	}
+
+	page, prs := pages[ts.URL]
+	if (!prs) {
+		t.Error("Expected to get a page back for " + ts.URL)
+	}
+
+	if (page.url != ts.URL) {
+		t.Errorf("Expected %s, found %s", ts.URL, page.url)
+	}
+
 }
 
 func TestHttpError(t *testing.T) {
@@ -160,7 +170,7 @@ func TestHttpError(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	_, e := getHtml(ts.URL)
+	_, e := getHtml(ts.URL, make(semaphore,1))
 
 	if (e == nil) {
 		t.Errorf("Expected Error on 500")
@@ -181,6 +191,6 @@ func TestDefaultUrlFilter(t *testing.T) {
 }
 
 func TestWholeEnchilada(t *testing.T) {
-	//Scan("http://digitalocean.com")
+	//Scan("https://www.digitalocean.com/")
 }
 

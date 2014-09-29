@@ -15,9 +15,6 @@ func main() {
 
 	url := args[1]
 
-	//fmt.Println("Hello, world " + url)
-
 	Scan(url)
-
 
 }
