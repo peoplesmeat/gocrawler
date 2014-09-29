@@ -229,6 +229,7 @@ func getHtml(url string, s semaphore) (HtmlResult, error) {
 // 2: anchor links, right now these are relevant, they shouldn't be.
 // 3: Smarter link filter rules. Right now links which are to .jpg are followed
 // 4. Error Handling. This version will silently ignore errors from getHtml, we might want to store and report them
+// 5. The scanning is regex based, which can be problematic. An html parsing library would be preferable
 func doPageScan(url string, parent string, scannedUrls *UrlList,
 	domainScanOptions *DomainScanOptions, output chan Page, s semaphore) {
 
